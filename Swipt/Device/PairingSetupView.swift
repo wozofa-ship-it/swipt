@@ -20,35 +20,26 @@ struct PairingSetupView: View {
                 "link", Text("Pair with This Device"),
                 description: description
             ) {
-                if #available(iOS 27, *) {
-                    PairingGuideView(hostName: session.hostName)
-                    VStack(alignment: .leading, spacing: 10) {
-                        SetupStepLine(number: 1, text: Text("Go to Settings › Privacy & Security › Developer Mode."))
-                        SetupStepLine(number: 2, text: Text("Tap “\("Pair with \(session.hostName)")”."))
-                        SetupStepLine(number: 3, text: Text("Enter the pairing code shown in the Live Activity."))
-                    }
-                    switch session.state {
-                    case .code(let pin):
-                        PairingCodeView(pin: pin)
-                    case .waiting:
-                        InlineProgress("Waiting for Settings")
-                    case .idle, .failed:
-                        EmptyView()
-                    }
+                PairingGuideView(hostName: session.hostName)
+                VStack(alignment: .leading, spacing: 10) {
+                    SetupStepLine(number: 1, text: Text("Go to Settings › Privacy & Security › Developer Mode."))
+                    SetupStepLine(number: 2, text: Text("Tap “\("Pair with \(session.hostName)")”."))
+                    SetupStepLine(number: 3, text: Text("Enter the pairing code shown in the Live Activity."))
+                }
+                switch session.state {
+                case .code(let pin):
+                    PairingCodeView(pin: pin)
+                case .waiting:
+                    InlineProgress("Waiting for Settings")
+                case .idle, .failed:
+                    EmptyView()
                 }
             } actions: {
-                if #available(iOS 27, *) {
-                    SetupPrimaryButton(title: Text("Pair in Settings"), action: pairInSettings)
-                    if session.isInProgress {
-                        SetupSecondaryButton(title: Text("Cancel")) { session.cancel() }
-                    } else {
-                        SetupSecondaryButton(title: Text("Import Pairing File…")) { isPickingFile = true }
-                    }
+                SetupPrimaryButton(title: Text("Pair in Settings"), action: pairInSettings)
+                if session.isInProgress {
+                    SetupSecondaryButton(title: Text("Cancel")) { session.cancel() }
                 } else {
-                    SetupPrimaryButton(title: Text("Import Pairing File…")) { isPickingFile = true }
-                    SetupSecondaryButton(title: Text("How to Get This File")) {
-                        openURL(URL(string: "https://swipt.io/\(Bundle.main.preferredLocalizations.first ?? "en")/docs/setup")!)
-                    }
+                    SetupSecondaryButton(title: Text("Import Pairing File…")) { isPickingFile = true }
                 }
             }
             .fileImporter(isPresented: $isPickingFile, allowedContentTypes: [.item]) { result in
@@ -70,10 +61,7 @@ struct PairingSetupView: View {
 
     private var description: Text {
         let description = String(localized: "Swipt needs to pair with this device to connect to its developer services.")
-        if #available(iOS 27, *) {
-            return Text(verbatim: description)
-        }
-        return Text(verbatim: description + "\n\n" + String(localized: "On devices running a version earlier than iOS 27, Swipt can’t provide self-service pairing, so you need a computer to get a pairing file."))
+        return Text(verbatim: description)
     }
 
     private var problemAlert: Binding<AlertState?> {
