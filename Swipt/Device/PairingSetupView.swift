@@ -8,8 +8,8 @@ struct PairingSetupView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
-    @State private var isPickingFile = false
     @State private var alert: AlertState?
+    @State private var filePickerDelegate: PairingFilePickerDelegate?
 
     private let pairing = PairingStore.shared
     private let session = Platform.shared.device.pairingSession
@@ -39,12 +39,7 @@ struct PairingSetupView: View {
                 if session.isInProgress {
                     SetupSecondaryButton(title: Text("Cancel")) { session.cancel() }
                 } else {
-                    SetupSecondaryButton(title: Text("Import Pairing File…")) { isPickingFile = true }
-                }
-            }
-            .fileImporter(isPresented: $isPickingFile, allowedContentTypes: [.item]) { result in
-                if case .success(let url) = result {
-                    importFile(url)
+                    SetupSecondaryButton(title: Text("Import Pairing File…")) { importPairingFile() }
                 }
             }
             .alert(problemAlert)
@@ -91,6 +86,31 @@ struct PairingSetupView: View {
         }
     }
 
+    private func importPairingFile() {
+        // SwiftUI .fileImporter 选不了文件（用户 2026-11-09 三次报）：
+        // 修饰符挂在 SetupPage 上时，文件选择器要么不弹、要么文件
+        // 置灰点不动。改走 UIKit UIDocumentPickerViewController，
+        // 直接从顶层 VC present（与 LoopbackSetupView 的分享同款
+        // 路子），asCopy 把文件拷进沙盒再读，不依赖安全域。
+        // 类型放最宽：.item/.data/.propertyList 全要，配对记录不管
+        // 是什么后缀都能点。
+        guard let top = topViewController() else {
+            alert = AlertState(String(localized: "Couldn’t Import the Pairing File"), error: MessageError("No window to present the file picker"))
+            return
+        }
+        let delegate = PairingFilePickerDelegate { [weak self] url in
+            self?.filePickerDelegate = nil
+            if let url {
+                self?.importFile(url)
+            }
+        }
+        filePickerDelegate = delegate
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item, .data, .propertyList], asCopy: true)
+        picker.allowsMultipleSelection = false
+        picker.delegate = delegate
+        top.present(picker, animated: true)
+    }
+
     private func importFile(_ url: URL) {
         Task {
             do {
@@ -113,5 +133,23 @@ private struct PairingCodeView: View {
             .textSelection(.enabled)
             .accessibilityLabel(Text(verbatim: pin.map(String.init).joined(separator: " ")))
             .padding(.vertical, 8)
+    }
+}
+
+// UIDocumentPickerViewController 的 delegate（weak 持有），由
+// PairingSetupView 的 @State 强持有到选择结束才释放。
+private final class PairingFilePickerDelegate: NSObject, UIDocumentPickerDelegate {
+    private let onPick: (URL?) -> Void
+
+    init(onPick: @escaping (URL?) -> Void) {
+        self.onPick = onPick
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        onPick(urls.first)
+    }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        onPick(nil)
     }
 }
