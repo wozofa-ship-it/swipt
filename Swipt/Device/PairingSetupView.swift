@@ -98,10 +98,15 @@ struct PairingSetupView: View {
             alert = AlertState(String(localized: "Couldn’t Import the Pairing File"), error: MessageError("No window to present the file picker"))
             return
         }
-        let delegate = PairingFilePickerDelegate { [weak self] url in
-            self?.filePickerDelegate = nil
+        let delegate = PairingFilePickerDelegate { url in
+            // 不加 [weak self]：PairingSetupView 是 struct（View），
+            // weak 只能用于 class，加了编不过（与 Live 3.8.277
+            // 同款红字）。struct 闭包抓 self 只是拷一份值，不产生
+            // 循环引用；@State 的存取走共享存储，拷出来的 self
+            // 改 filePickerDelegate 一样生效。
+            self.filePickerDelegate = nil
             if let url {
-                self?.importFile(url)
+                self.importFile(url)
             }
         }
         filePickerDelegate = delegate
